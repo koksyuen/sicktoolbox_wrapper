@@ -200,8 +200,8 @@ double last_time_stamp=0;
 
         while (ros::ok()) {
             /* Grab the measurements (from all sectors) */
-//        	sick_nav350.GetDataLandMark(1,1);
-        	sick_nav350.GetDataNavigation(1,1);
+        	sick_nav350.GetDataLandMark(1,1);
+        	//sick_nav350.GetDataNavigation(1,1);
             sick_nav350.GetSickMeasurements(range_values,
                                         &num_measurements,
                                         &sector_step_angle,
