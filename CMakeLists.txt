@@ -1,11 +1,21 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(sicktoolbox_wrapper)
 
-find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs sicktoolbox rosconsole diagnostic_updater tf)
+find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs sicktoolbox rosconsole diagnostic_updater tf message_generation)
 
 ## System dependencies are found with CMake's conventions
 #find_package(Threads)
 
+
+add_message_files(
+  FILES
+  navtimestamp.msg
+)
+
+generate_messages(
+   DEPENDENCIES
+   std_msgs
+)
 ###################################
 ## catkin specific configuration ##
 ###################################
@@ -17,7 +27,7 @@ find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs sicktoolbox rosconsol
 catkin_package(
   INCLUDE_DIRS
   LIBRARIES
-  CATKIN_DEPENDS roscpp sensor_msgs sicktoolbox rosconsole diagnostic_updater tf
+  CATKIN_DEPENDS roscpp sensor_msgs sicktoolbox rosconsole diagnostic_updater tf message_runtime
   DEPENDS
 )
 

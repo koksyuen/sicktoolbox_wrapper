@@ -14,6 +14,7 @@
 #include <deque>
 #include <tf/transform_broadcaster.h>
 #include <nav_msgs/Odometry.h>
+#include <sicktoolbox_wrapper/navtimestamp.h>
 #define DEG2RAD(x) ((x)*M_PI/180.)
 
 using namespace std;
@@ -24,7 +25,8 @@ void publish_scan(ros::Publisher *pub, double *range_values,
                   uint32_t n_range_values, unsigned int *intensity_values,
                    uint32_t n_intensity_values, ros::Time start,
                   double scan_time, bool inverted, float angle_min,
-                  float angle_max, std::string frame_id)
+                  float angle_max, std::string frame_id,
+		unsigned int sector_start_timestamp,ros::Publisher *pub1)
 {
   static int scan_count = 0;
   sensor_msgs::LaserScan scan_msg;
@@ -52,6 +54,10 @@ void publish_scan(ros::Publisher *pub, double *range_values,
     scan_msg.intensities[i] = 0;//(float)intensity_values[i];
   }
   pub->publish(scan_msg);
+	sicktoolbox_wrapper::navtimestamp st;
+	st.stamp=start;
+	st.navtimestamp=sector_start_timestamp;
+	pub1->publish(st);
 }
 
 // A complimentary filter to get a (much) better time estimate, does not
@@ -119,15 +125,16 @@ class averager {
         }
 };
        
-void PublishReflectorTransform(double x,double y,double th,tf::TransformBroadcaster odom_broadcaster)
+void PublishReflectorTransform(double x,double y,double th,tf::TransformBroadcaster odom_broadcaster,std::string frame_id,std::string child_frame_id)
 {
+	printf("\npos %.2f %.2f %.2f\n",x,y,th);
     ros::Time current_time;
 	current_time=ros::Time::now();
     geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(th);
     geometry_msgs::TransformStamped odom_trans;
     odom_trans.header.stamp = current_time;
-    odom_trans.header.frame_id = "map";
-    odom_trans.child_frame_id = "reflector";
+    odom_trans.header.frame_id =frame_id;// "map";
+    odom_trans.child_frame_id = child_frame_id;//"reflector";
 
     odom_trans.transform.translation.x = x;
     odom_trans.transform.translation.y = y;
@@ -149,14 +156,22 @@ int main(int argc, char *argv[]) {
     double active_sector_start_angle = 0;
     double active_sector_stop_angle = 360;//269.75;
     double smoothing_factor, error_threshold;
+    std::string reflector_frame_id,reflector_child_frame_id;
     ros::NodeHandle nh;
 	ros::NodeHandle nh_ns("~");
 	nh_ns.param<std::string>("scan", scan, "scan");
 	ros::Publisher scan_pub = nh.advertise<sensor_msgs::LaserScan>(scan, 1);
+
+	ros::Publisher scan_pub1 = nh.advertise<sicktoolbox_wrapper::navtimestamp>("navtimestamp", 1);
+
 	nh_ns.param("port", port, DEFAULT_SICK_TCP_PORT);
 	nh_ns.param("ipaddress", ipaddress, (std::string)DEFAULT_SICK_IP_ADDRESS);
 	nh_ns.param("inverted", inverted, false);
 	nh_ns.param<std::string>("frame_id", frame_id, "laser");
+
+	nh_ns.param<std::string>("reflector_frame_id", reflector_frame_id, "map");
+	nh_ns.param<std::string>("reflector_child_frame_id", reflector_child_frame_id, "reflector");
+
     nh_ns.param("timer_smoothing_factor", smoothing_factor, 0.97);
     nh_ns.param("timer_error_threshold", error_threshold, 0.5);
     nh_ns.param("resolution", sick_step_angle, 1.0); 
@@ -201,7 +216,7 @@ double last_time_stamp=0;
         while (ros::ok()) {
             /* Grab the measurements (from all sectors) */
         	sick_nav350.GetDataLandMark(1,1);
-        	//sick_nav350.GetDataNavigation(1,1);
+//        	sick_nav350.GetDataNavigation(1,1);
             sick_nav350.GetSickMeasurements(range_values,
                                         &num_measurements,
                                         &sector_step_angle,
@@ -221,7 +236,7 @@ double last_time_stamp=0;
 	x2=x2/1000;
 	y2=y2/1000;
 	std::cout<<sick_nav350.PoseData_.x<<"   "<<x1<<" "<<y1<<"   "<<x2<<" "<<y2<<std::endl;
-	PublishReflectorTransform(x2,y2,phi2,odom_broadcaster);
+	PublishReflectorTransform(x2,y2,phi2,odom_broadcaster,reflector_frame_id,reflector_child_frame_id);
 	if (sector_start_timestamp<last_time_stamp) 
 	{
 		loop_rate.sleep();
@@ -249,7 +264,7 @@ double last_time_stamp=0;
 		sector_stop_angle-=180;
             publish_scan(&scan_pub, range_values, num_measurements, intensity_values,
                    num_measurements, start_scan_time, scan_duration, inverted,
-                   DEG2RAD((float)sector_start_angle), DEG2RAD((float)sector_stop_angle), frame_id);
+                   DEG2RAD((float)sector_start_angle), DEG2RAD((float)sector_stop_angle), frame_id,sector_start_timestamp,&scan_pub1);
 /*
             ROS_INFO_STREAM/*DEBUG_STREAM*//*("Num meas: " << num_measurements
                  << " smoothed start T: " << start_scan_time
