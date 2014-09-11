@@ -198,7 +198,7 @@ double last_time_stamp=0;
         // TODO: do some calls to setup the device - e.g. scan rate.
         try {
 //		sick_nav350.GetSickIdentity();
-		sick_nav350.SetOperatingMode(3);
+		sick_nav350.SetOperatingMode(4);
         } catch (...) {
             ROS_ERROR("Configuration error");
             return -1;
@@ -215,8 +215,8 @@ double last_time_stamp=0;
 
         while (ros::ok()) {
             /* Grab the measurements (from all sectors) */
-        	sick_nav350.GetDataLandMark(1,1);
-//        	sick_nav350.GetDataNavigation(1,1);
+//      	sick_nav350.GetDataLandMark(1,1);
+        	sick_nav350.GetDataNavigation(1,1);
             sick_nav350.GetSickMeasurements(range_values,
                                         &num_measurements,
                                         &sector_step_angle,
