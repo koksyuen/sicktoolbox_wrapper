@@ -46,8 +46,6 @@ add_executable(sicklms ros/sicklms/sicklms.cpp)
 target_link_libraries(sicklms ${catkin_LIBRARIES})
 
 add_executable(sicknav350 ros/sicknav350/sicknav350.cpp)
-add_dependencies(sicknav350 sicknav350_msgs_generate_msgs_cpp)
-
 target_link_libraries(sicknav350 ${catkin_LIBRARIES})
 
 add_executable(print_scans standalone/print_scans.cpp)
