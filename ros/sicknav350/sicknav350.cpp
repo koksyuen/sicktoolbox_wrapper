@@ -14,9 +14,13 @@
 #include "sensor_msgs/LaserScan.h" 
 #include <deque>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
 #include <nav_msgs/Odometry.h>
 #include <sicktoolbox_wrapper/navtimestamp.h>
 #define DEG2RAD(x) ((x)*M_PI/180.)
+
+const double TRANSFORM_TIMEOUT = 20.0f;
+const double POLLING_DURATION = 0.05f;
 
 using namespace std;
 using namespace SickToolbox;
@@ -162,7 +166,10 @@ int main(int argc, char *argv[])
   double active_sector_start_angle = 0;
   double active_sector_stop_angle = 360;//269.75;
   double smoothing_factor, error_threshold;
-  std::string sick_frame_id, reflector_frame_id,reflector_child_frame_id;
+  std::string sick_frame_id;
+  std::string target_frame_id; // the frame to be publish relative to frame_id
+  std::string reflector_frame_id,reflector_child_frame_id;
+  tf::StampedTransform sickn350_to_target_tf;
   ros::NodeHandle nh;
   ros::NodeHandle nh_ns("~");
   nh_ns.param<std::string>("scan", scan, "scan");
@@ -179,6 +186,7 @@ int main(int argc, char *argv[])
   nh_ns.param<std::string>("sick_frame_id", sick_frame_id, "map");
   nh_ns.param<std::string>("reflector_frame_id", reflector_frame_id, "nav350");
   nh_ns.param<std::string>("reflector_child_frame_id", reflector_child_frame_id, "reflector");
+  nh_ns.param<std::string>("target_frame_id",target_frame_id,sick_frame_id);
 
   nh_ns.param("wait_command", wait, 1);
   nh_ns.param("mask_command", mask, 2);
@@ -202,6 +210,7 @@ int main(int argc, char *argv[])
 
   std::vector<tf::TransformBroadcaster> landmark_broadcasters;
   tf::TransformBroadcaster odom_broadcaster;
+  tf::TransformListener tf_listerner;
   /* Instantiate the object */
   SickNav350 sick_nav350(ipaddress.c_str(),port);
   double last_time_stamp=0;
@@ -238,6 +247,34 @@ int main(int argc, char *argv[])
     ros::Rate loop_rate(8);
     std::vector<tf::TransformBroadcaster> odom_broadcasters;
 
+    // looking up transform from sicknav350 to target frame
+    if(target_frame_id == sick_frame_id)
+    {
+      sickn350_to_target_tf.setIdentity();
+    }
+    else
+    {
+      try
+      {
+        std::string error_msg;
+        ros::Time current_time = ros::Time(0);
+        if(!tf_listerner.waitForTransform(
+            target_frame_id,sick_frame_id,ros::Time(0),ros::Duration(TRANSFORM_TIMEOUT),
+            ros::Duration(POLLING_DURATION),&error_msg))
+        {
+          ROS_ERROR_STREAM("Transform lookup timed out, error msg: "<<error_msg);
+          return -1;
+        }
+
+        tf_listerner.lookupTransform(target_frame_id,sick_frame_id,current_time,sickn350_to_target_tf);
+      }
+      catch(tf::LookupException &exp)
+      {
+        ROS_ERROR_STREAM("Transform lookup between "<<sick_frame_id<<" and "<<target_frame_id<<" failed, exiting");
+        return -1;
+      }
+    }
+
     while (ros::ok())
     {
       //Grab the measurements (from all sectors)
@@ -265,14 +302,6 @@ int main(int argc, char *argv[])
                                       &sector_start_timestamp,
                                       &sector_stop_timestamp);
 
-/*     double x2,y2;
-      double phi2=phi1-180000-1250-300;
-      phi2=phi2/1000/180*3.14159;
-      x2=x1-529*cos(phi2);
-      y2=y1-529*sin(phi2);
-      x2=x2/1000;
-      y2=y2/1000;
-      std::cout<<num_measurements<<"   "<<x1<<" "<<y1<<" "<<phi1<<"   "<<x2<<" "<<y2<<std::endl;*/
 
       /*
        * Get nav localization data and publish /map to /odom transform
@@ -281,14 +310,18 @@ int main(int argc, char *argv[])
       double y1=(double) sick_nav350.PoseData_.y;
       double phi1=sick_nav350.PoseData_.phi;
       ROS_INFO_STREAM("NAV350 pose in x y alpha:"<<x1<<" "<<y1<<" "<<phi1/1000.0);
-      tf::Transform odom_transform;
+      tf::Transform odom_to_sick_tf;
+      tf::Transform odom_to_target_tf;
       tf::Quaternion odomquat=tf::createQuaternionFromYaw(DEG2RAD(phi1/1000.0));
       odomquat.inverse();
-      odom_transform.setRotation(odomquat);
-      odom_transform.setOrigin(tf::Vector3(-x1 / 1000, -y1/ 1000, 0.0));
-      ROS_INFO_STREAM("NAV350 x pos: "<<-x1<<" y pos: "<<-y1<<" with frame: "<<sick_frame_id);
-      odom_broadcaster.sendTransform(tf::StampedTransform(odom_transform, ros::Time::now(),
-                                                                        frame_id, sick_frame_id));
+      odom_to_sick_tf.setRotation(odomquat);
+      odom_to_sick_tf.setOrigin(tf::Vector3(-x1 / 1000, -y1/ 1000, 0.0));
+
+      // converting to target frame
+      odom_to_target_tf = odom_to_sick_tf * sickn350_to_target_tf;
+
+      odom_broadcaster.sendTransform(tf::StampedTransform(odom_to_target_tf, ros::Time::now(),
+                                                                        frame_id, target_frame_id));
 
 
       /*
