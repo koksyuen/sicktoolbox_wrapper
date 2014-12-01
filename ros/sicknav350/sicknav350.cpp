@@ -19,6 +19,9 @@
 #include <sicktoolbox_wrapper/navtimestamp.h>
 #define DEG2RAD(x) ((x)*M_PI/180.)
 
+const double TRANSFORM_TIMEOUT = 20.0f;
+const double POLLING_DURATION = 0.05f;
+
 using namespace std;
 using namespace SickToolbox;
 
@@ -253,7 +256,17 @@ int main(int argc, char *argv[])
     {
       try
       {
-        tf_listerner.lookupTransform(target_frame_id,sick_frame_id,ros::Time(0),sickn350_to_target_tf);
+        std::string error_msg;
+        ros::Time current_time = ros::Time(0);
+        if(!tf_listerner.waitForTransform(
+            target_frame_id,sick_frame_id,ros::Time(0),ros::Duration(TRANSFORM_TIMEOUT),
+            ros::Duration(POLLING_DURATION),&error_msg))
+        {
+          ROS_ERROR_STREAM("Transform lookup timed out, error msg: "<<error_msg);
+          return -1;
+        }
+
+        tf_listerner.lookupTransform(target_frame_id,sick_frame_id,current_time,sickn350_to_target_tf);
       }
       catch(tf::LookupException &exp)
       {
