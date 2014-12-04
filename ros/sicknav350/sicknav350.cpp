@@ -134,16 +134,18 @@ void createOdometryMessage(const ros::Duration& time_elapsed, const tf::Transfor
   // setting position
   odom_msg.pose.pose.position.x = current_transform.getOrigin().getX();
   odom_msg.pose.pose.position.y = current_transform.getOrigin().getY();
-  odom_msg.pose.pose.position.z = 0.0;
+  odom_msg.pose.pose.position.z = 0.0f;
+  odom_msg.pose.covariance.assign(0.0f);
   tf::quaternionTFToMsg(current_transform.getRotation(),odom_msg.pose.pose.orientation);
 
   // set velocity
   odom_msg.twist.twist.linear.x = dx;
   odom_msg.twist.twist.linear.y = dy;
-  odom_msg.twist.twist.linear.z = 0;
-  odom_msg.twist.twist.angular.x = 0.;
-  odom_msg.twist.twist.angular.y = 0.;
+  odom_msg.twist.twist.linear.z = 0.0f;
+  odom_msg.twist.twist.angular.x = 0.0f;
+  odom_msg.twist.twist.angular.y = 0.0f;
   odom_msg.twist.twist.angular.z = dr;
+  odom_msg.twist.covariance.assign(0.0f);
 
 }
 
