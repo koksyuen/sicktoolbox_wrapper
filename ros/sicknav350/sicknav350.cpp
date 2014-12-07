@@ -229,7 +229,7 @@ int main(int argc, char *argv[])
   nh_ns.param("publish_odom",publish_odom,false);
   nh_ns.param("perform_mapping", do_mapping, true);
   nh_ns.param<std::string>("frame_id", frame_id, "map");
-  nh_ns.param<std::string>("sick_frame_id", sick_frame_id, "map");
+  nh_ns.param<std::string>("sick_frame_id", sick_frame_id, "sick_nav350");
   nh_ns.param<std::string>("reflector_frame_id", reflector_frame_id, "nav350");
   nh_ns.param<std::string>("reflector_child_frame_id", reflector_child_frame_id, "reflector");
   nh_ns.param<std::string>("target_frame_id",target_frame_id,sick_frame_id);
@@ -273,6 +273,7 @@ int main(int argc, char *argv[])
       sick_nav350.SetOperatingMode((int)OperatingModes::MAPPING);
       sick_nav350.DoMapping();
       sick_nav350.SetOperatingMode((int)OperatingModes::STANDBY);
+      ROS_INFO_STREAM("Sicknav50 Mapping Completed");
     }
     try
     {
@@ -407,6 +408,7 @@ int main(int argc, char *argv[])
       // converting to target frame
       odom_to_target_tf = odom_to_sick_tf * sickn350_to_target_tf;
 
+      ROS_WARN_STREAM("Sending transform from "<<frame_id<<" to "<<target_frame_id);
       odom_broadcaster.sendTransform(tf::StampedTransform(odom_to_target_tf, ros::Time::now(),
                                                                         frame_id, target_frame_id));
 
@@ -426,13 +428,13 @@ int main(int argc, char *argv[])
       int num_reflectors=sick_nav350.PoseData_.numUsedReflectors;
       int number_reflectors=sick_nav350.ReflectorData_.num_reflector;
       std::vector<double> Rx(number_reflectors), Ry(number_reflectors);
-      ROS_INFO_STREAM("NAV350 # reflectors seen:"<<number_reflectors);
-      ROS_INFO_STREAM("NAV350 # reflectors used:"<<num_reflectors);
+      ROS_DEBUG_STREAM("NAV350 # reflectors seen:"<<number_reflectors);
+      ROS_DEBUG_STREAM("NAV350 # reflectors used:"<<num_reflectors);
       for (int r=0;r<number_reflectors; r++)
       {
         Rx[r]=(double) sick_nav350.ReflectorData_.x[r];
         Ry[r]=(double) sick_nav350.ReflectorData_.y[r];
-        ROS_INFO_STREAM("Reflector "<<r<<" x pos: "<<Rx[r]<<" y pos: "<<Ry[r]);
+        ROS_DEBUG_STREAM("Reflector "<<r<<" x pos: "<<Rx[r]<<" y pos: "<<Ry[r]);
       }
       landmark_broadcasters.resize(number_reflectors);
       PublishReflectorTransform(Rx,Ry,DEG2RAD(phi1/1000.0),landmark_broadcasters,reflector_frame_id,reflector_child_frame_id);
