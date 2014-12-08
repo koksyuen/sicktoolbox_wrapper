@@ -17,10 +17,25 @@
 #include <tf/transform_listener.h>
 #include <nav_msgs/Odometry.h>
 #include <sicktoolbox_wrapper/navtimestamp.h>
+
 #define DEG2RAD(x) ((x)*M_PI/180.)
 
 const double TRANSFORM_TIMEOUT = 20.0f;
 const double POLLING_DURATION = 0.05f;
+const std::string ODOM_TOPIC = "odom";
+
+namespace OperatingModes
+{
+  enum OperatingMode
+  {
+    POWERDOWN = 0,
+    STANDBY = 1,
+    MAPPING = 2,
+    LANDMARK = 3,
+    NAVIGATION = 4,
+  };
+}
+typedef OperatingModes::OperatingMode OperatingMode;
 
 using namespace std;
 using namespace SickToolbox;
@@ -108,6 +123,32 @@ public:
   }
 };
 
+void createOdometryMessage(const ros::Duration& time_elapsed, const tf::Transform& prev_transform,
+                           const tf::Transform& current_transform, nav_msgs::Odometry& odom_msg)
+{
+  double dt = time_elapsed.toSec();
+  double dx = (current_transform.getOrigin().getX() - prev_transform.getOrigin().getX())/dt;
+  double dy = (current_transform.getOrigin().getY() - prev_transform.getOrigin().getY())/dt;
+  double dr = (tf::getYaw(current_transform.getRotation()) - tf::getYaw(prev_transform.getRotation()))/dt;
+
+  // setting position
+  odom_msg.pose.pose.position.x = current_transform.getOrigin().getX();
+  odom_msg.pose.pose.position.y = current_transform.getOrigin().getY();
+  odom_msg.pose.pose.position.z = 0.0f;
+  odom_msg.pose.covariance.assign(0.0f);
+  tf::quaternionTFToMsg(current_transform.getRotation(),odom_msg.pose.pose.orientation);
+
+  // set velocity
+  odom_msg.twist.twist.linear.x = dx;
+  odom_msg.twist.twist.linear.y = dy;
+  odom_msg.twist.twist.linear.z = 0.0f;
+  odom_msg.twist.twist.angular.x = 0.0f;
+  odom_msg.twist.twist.angular.y = 0.0f;
+  odom_msg.twist.twist.angular.z = dr;
+  odom_msg.twist.covariance.assign(0.0f);
+
+}
+
 class averager {
 protected:
   std::deque<double> deq;
@@ -161,6 +202,7 @@ int main(int argc, char *argv[])
   std::string frame_id;
   std::string scan;
   bool inverted, do_mapping;
+  bool publish_odom;
   int sick_motor_speed = 8;//10; // Hz
   double sick_step_angle = 1.5;//0.5;//0.25; // deg (0.125 = no gaps between spots)
   double active_sector_start_angle = 0;
@@ -168,25 +210,30 @@ int main(int argc, char *argv[])
   double smoothing_factor, error_threshold;
   std::string sick_frame_id;
   std::string target_frame_id; // the frame to be publish relative to frame_id
+  std::string mobile_base_frame_id = "";
   std::string reflector_frame_id,reflector_child_frame_id;
   tf::StampedTransform sickn350_to_target_tf;
+  tf::StampedTransform target_to_mobile_base_tf;
+
   ros::NodeHandle nh;
   ros::NodeHandle nh_ns("~");
   nh_ns.param<std::string>("scan", scan, "scan");
   ros::Publisher scan_pub = nh.advertise<sensor_msgs::LaserScan>(scan, 1);
-
   ros::Publisher scan_pub1 = nh.advertise<sicktoolbox_wrapper::navtimestamp>("navtimestamp", 1);
+  ros::Publisher odom_pub;
 
   nh_ns.param("mode", op_mode, 4);
   nh_ns.param("port", port, DEFAULT_SICK_TCP_PORT);
   nh_ns.param("ipaddress", ipaddress, (std::string)DEFAULT_SICK_IP_ADDRESS);
   nh_ns.param("inverted", inverted, false);
+  nh_ns.param("publish_odom",publish_odom,false);
   nh_ns.param("perform_mapping", do_mapping, true);
   nh_ns.param<std::string>("frame_id", frame_id, "map");
-  nh_ns.param<std::string>("sick_frame_id", sick_frame_id, "map");
+  nh_ns.param<std::string>("sick_frame_id", sick_frame_id, "sick_nav350");
   nh_ns.param<std::string>("reflector_frame_id", reflector_frame_id, "nav350");
   nh_ns.param<std::string>("reflector_child_frame_id", reflector_child_frame_id, "reflector");
   nh_ns.param<std::string>("target_frame_id",target_frame_id,sick_frame_id);
+  nh_ns.param<std::string>("mobile_base_frame_id",mobile_base_frame_id,mobile_base_frame_id);
 
   nh_ns.param("wait_command", wait, 1);
   nh_ns.param("mask_command", mask, 2);
@@ -223,9 +270,10 @@ int main(int argc, char *argv[])
 
     if (do_mapping)
     {
-      sick_nav350.SetOperatingMode(2);
+      sick_nav350.SetOperatingMode((int)OperatingModes::MAPPING);
       sick_nav350.DoMapping();
-      sick_nav350.SetOperatingMode(1);
+      sick_nav350.SetOperatingMode((int)OperatingModes::STANDBY);
+      ROS_INFO_STREAM("Sicknav50 Mapping Completed");
     }
     try
     {
@@ -275,6 +323,46 @@ int main(int argc, char *argv[])
       }
     }
 
+
+    ros::Time previous_time = ros::Time::now()-ros::Duration(0.5f);
+    tf::Transform mobile_base_current_tf = tf::Transform::getIdentity();
+    tf::Transform mobile_base_prev_tf = tf::Transform::getIdentity();
+    nav_msgs::Odometry odom_msg;
+
+    if(publish_odom)
+    {
+      odom_pub = nh.advertise<nav_msgs::Odometry>(ODOM_TOPIC, 1);
+
+      if(mobile_base_frame_id == "")
+      {
+        ROS_ERROR_STREAM("Frame id for mobile base was not set in the parameter list");
+        return -1;
+      }
+      odom_msg.header.frame_id = frame_id;
+      odom_msg.child_frame_id = mobile_base_frame_id;
+
+      try
+      {
+        std::string error_msg;
+        ros::Time current_time = ros::Time(0);
+        if(!tf_listerner.waitForTransform(
+            target_frame_id,mobile_base_frame_id,ros::Time(0),ros::Duration(TRANSFORM_TIMEOUT),
+            ros::Duration(POLLING_DURATION),&error_msg))
+        {
+          ROS_ERROR_STREAM("Transform lookup timed out, error msg: "<<error_msg);
+          return -1;
+        }
+
+        tf_listerner.lookupTransform(mobile_base_frame_id,target_frame_id,current_time,target_to_mobile_base_tf);
+      }
+      catch(tf::LookupException &exp)
+      {
+        ROS_ERROR_STREAM("Transform lookup between "<<mobile_base_frame_id<<" and "<<target_frame_id<<" failed, exiting");
+        return -1;
+      }
+
+    }
+
     while (ros::ok())
     {
       //Grab the measurements (from all sectors)
@@ -320,9 +408,19 @@ int main(int argc, char *argv[])
       // converting to target frame
       odom_to_target_tf = odom_to_sick_tf * sickn350_to_target_tf;
 
+      ROS_WARN_STREAM("Sending transform from "<<frame_id<<" to "<<target_frame_id);
       odom_broadcaster.sendTransform(tf::StampedTransform(odom_to_target_tf, ros::Time::now(),
                                                                         frame_id, target_frame_id));
 
+      // publishing odometry
+      if(publish_odom)
+      {
+        mobile_base_current_tf = odom_to_target_tf*target_to_mobile_base_tf;
+        createOdometryMessage(ros::Time::now() - previous_time,mobile_base_prev_tf,mobile_base_current_tf,odom_msg);
+        mobile_base_prev_tf = mobile_base_current_tf;
+        previous_time = ros::Time::now();
+        odom_pub.publish(odom_msg);
+      }
 
       /*
        * Get landmark data and broadcast transforms
@@ -330,13 +428,13 @@ int main(int argc, char *argv[])
       int num_reflectors=sick_nav350.PoseData_.numUsedReflectors;
       int number_reflectors=sick_nav350.ReflectorData_.num_reflector;
       std::vector<double> Rx(number_reflectors), Ry(number_reflectors);
-      ROS_INFO_STREAM("NAV350 # reflectors seen:"<<number_reflectors);
-      ROS_INFO_STREAM("NAV350 # reflectors used:"<<num_reflectors);
+      ROS_DEBUG_STREAM("NAV350 # reflectors seen:"<<number_reflectors);
+      ROS_DEBUG_STREAM("NAV350 # reflectors used:"<<num_reflectors);
       for (int r=0;r<number_reflectors; r++)
       {
         Rx[r]=(double) sick_nav350.ReflectorData_.x[r];
         Ry[r]=(double) sick_nav350.ReflectorData_.y[r];
-        ROS_INFO_STREAM("Reflector "<<r<<" x pos: "<<Rx[r]<<" y pos: "<<Ry[r]);
+        ROS_DEBUG_STREAM("Reflector "<<r<<" x pos: "<<Rx[r]<<" y pos: "<<Ry[r]);
       }
       landmark_broadcasters.resize(number_reflectors);
       PublishReflectorTransform(Rx,Ry,DEG2RAD(phi1/1000.0),landmark_broadcasters,reflector_frame_id,reflector_child_frame_id);
