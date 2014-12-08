@@ -314,7 +314,7 @@ int main(int argc, char *argv[])
           return -1;
         }
 
-        tf_listerner.lookupTransform(target_frame_id,sick_frame_id,current_time,sickn350_to_target_tf);
+        tf_listerner.lookupTransform(sick_frame_id,target_frame_id,current_time,sickn350_to_target_tf);
       }
       catch(tf::LookupException &exp)
       {
@@ -353,7 +353,7 @@ int main(int argc, char *argv[])
           return -1;
         }
 
-        tf_listerner.lookupTransform(mobile_base_frame_id,target_frame_id,current_time,target_to_mobile_base_tf);
+        tf_listerner.lookupTransform(target_frame_id,mobile_base_frame_id,current_time,target_to_mobile_base_tf);
       }
       catch(tf::LookupException &exp)
       {
