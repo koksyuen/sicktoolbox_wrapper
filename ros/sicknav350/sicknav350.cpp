@@ -178,17 +178,16 @@ void PublishReflectorTransform(std::vector<double> x,std::vector<double> y,doubl
   tf::Quaternion tfquat=tf::createQuaternionFromYaw(th);//th should be 0? no orientation information on reflectors?
 
   std::ostringstream childframes;
-  ROS_INFO_STREAM("Making "<<x.size()<<" broadcasters");
   for (int i=0;i<x.size();i++)
   {
     childframes << child_frame_id << i;
     b_transforms.setRotation(tfquat);
     b_transforms.setOrigin(tf::Vector3(-x[i] / 1000, -y[i] / 1000, 0.0));
-    ROS_INFO_STREAM("Reflector "<<i<<" x pos: "<<-x[i]<<" y pos: "<<-y[i]<<" with frame: "<<childframes.str());
+    ROS_DEBUG_STREAM("Reflector "<<i<<" x pos: "<<-x[i]<<" y pos: "<<-y[i]<<" with frame: "<<childframes.str());
 
     //send the transform
     odom_broadcaster[i].sendTransform(tf::StampedTransform(b_transforms, ros::Time::now(),
-                                                                      frame_id, childframes.str()));
+                                                           frame_id, childframes.str()));
     childframes.str(std::string());
     childframes.clear();
   }
@@ -373,7 +372,7 @@ int main(int argc, char *argv[])
       }
       else if (op_mode==4)
       {
-      ROS_INFO_STREAM("Getting nav data");
+      ROS_DEBUG_STREAM("Getting nav data");
       sick_nav350.GetDataNavigation(wait,mask);
       }
       else
@@ -381,7 +380,7 @@ int main(int argc, char *argv[])
         ROS_INFO_STREAM("Selected operating mode does not return data... try again");
         return -1;
       }
-      ROS_INFO_STREAM("Getting sick range/scan measurements");
+      ROS_DEBUG_STREAM("Getting sick range/scan measurements");
       sick_nav350.GetSickMeasurements(range_values,
                                       &num_measurements,
                                       &sector_step_angle,
@@ -397,7 +396,7 @@ int main(int argc, char *argv[])
       double x1=(double) sick_nav350.PoseData_.x;
       double y1=(double) sick_nav350.PoseData_.y;
       double phi1=sick_nav350.PoseData_.phi;
-      ROS_INFO_STREAM("NAV350 pose in x y alpha:"<<x1<<" "<<y1<<" "<<phi1/1000.0);
+      ROS_DEBUG_STREAM("NAV350 pose in x y alpha:"<<x1<<" "<<y1<<" "<<phi1/1000.0);
       tf::Transform odom_to_sick_tf;
       tf::Transform odom_to_target_tf;
       tf::Quaternion odomquat=tf::createQuaternionFromYaw(DEG2RAD(phi1/1000.0));
@@ -408,7 +407,7 @@ int main(int argc, char *argv[])
       // converting to target frame
       odom_to_target_tf = odom_to_sick_tf * sickn350_to_target_tf;
 
-      ROS_WARN_STREAM("Sending transform from "<<frame_id<<" to "<<target_frame_id);
+      ROS_DEBUG_STREAM("Sending transform from "<<frame_id<<" to "<<target_frame_id);
       odom_broadcaster.sendTransform(tf::StampedTransform(odom_to_target_tf, ros::Time::now(),
                                                                         frame_id, target_frame_id));
 
