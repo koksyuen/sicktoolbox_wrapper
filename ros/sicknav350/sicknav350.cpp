@@ -468,7 +468,7 @@ int main(int argc, char *argv[])
       sector_stop_angle-=180;
       publish_scan(&scan_pub, range_values, num_measurements, intensity_values,
                    num_measurements, start_scan_time, scan_duration, inverted,
-                   DEG2RAD((float)sector_start_angle), DEG2RAD((float)sector_stop_angle), frame_id,sector_start_timestamp,&scan_pub1);
+                   DEG2RAD((float)sector_start_angle), DEG2RAD((float)sector_stop_angle), sick_frame_id, sector_start_timestamp,&scan_pub1);
 
 
 
