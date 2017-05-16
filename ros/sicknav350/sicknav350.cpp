@@ -127,7 +127,7 @@ class averager {
        
 void PublishReflectorTransform(double x,double y,double th,tf::TransformBroadcaster odom_broadcaster,std::string frame_id,std::string child_frame_id)
 {
-//	printf("\npos %.2f %.2f %.2f\n",x,y,th);
+	printf("\npos %.2f %.2f %.2f\n",x,y,th);
     ros::Time current_time;
 	current_time=ros::Time::now();
     geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(th);
@@ -144,19 +144,11 @@ void PublishReflectorTransform(double x,double y,double th,tf::TransformBroadcas
     //send the transform
     odom_broadcaster.sendTransform(odom_trans);
 }
-double vx,vy,vth;
-void OdometryCallback(const nav_msgs::Odometry::ConstPtr& msg)
-{
-	vx=msg->twist.twist.linear.x;
-	vy=msg->twist.twist.linear.y;
-	vth=msg->twist.twist.angular.z;
-}
 int main(int argc, char *argv[]) {
     ros::init(argc, argv, "sicknav350");
     int port;
     std::string ipaddress;
     std::string frame_id;
-    std::string odometry;
     std::string scan;
     bool inverted;
     int sick_motor_speed = 8;//10; // Hz
@@ -180,12 +172,6 @@ int main(int argc, char *argv[]) {
 	nh_ns.param<std::string>("reflector_frame_id", reflector_frame_id, "map");
 	nh_ns.param<std::string>("reflector_child_frame_id", reflector_child_frame_id, "reflector");
 
-	nh_ns.param<std::string>("odometry", odometry, "lgv1000/pose");
-
-
-	ros::Subscriber sub = nh.subscribe(odometry, 10, OdometryCallback);
-
-
     nh_ns.param("timer_smoothing_factor", smoothing_factor, 0.97);
     nh_ns.param("timer_error_threshold", error_threshold, 0.5);
     nh_ns.param("resolution", sick_step_angle, 1.0); 
@@ -205,8 +191,6 @@ int main(int argc, char *argv[]) {
     double sector_stop_angle = {0};
     /* Instantiate the object */
     SickNav350 sick_nav350(ipaddress.c_str(),port);
-//    sick_nav350.SetSpeed(100,-200,300,4000,0);
-//    getchar();
 double last_time_stamp=0;
     try {
         /* Initialize the device */
@@ -228,7 +212,7 @@ double last_time_stamp=0;
         double full_duration;  
 	ros::Rate loop_rate(8);
 	tf::TransformBroadcaster odom_broadcaster;
-printf("start loop\n");
+
         while (ros::ok()) {
             /* Grab the measurements (from all sectors) */
 //      	sick_nav350.GetDataLandMark(1,1);
@@ -247,11 +231,11 @@ printf("start loop\n");
 	double x2,y2;
 	double phi2=phi1-180000-1250-300;
 	phi2=phi2/1000/180*3.14159;
-	x2=x1-/*529*/300*cos(phi2);
-	y2=y1-/*529*/300*sin(phi2);
+	x2=x1-529*cos(phi2);
+	y2=y1-529*sin(phi2);
 	x2=x2/1000;
 	y2=y2/1000;
-//	std::cout<<sick_nav350.PoseData_.x<<"   "<<x1<<" "<<y1<<"   "<<x2<<" "<<y2<<std::endl;
+	std::cout<<sick_nav350.PoseData_.x<<"   "<<x1<<" "<<y1<<"   "<<x2<<" "<<y2<<std::endl;
 	PublishReflectorTransform(x2,y2,phi2,odom_broadcaster,reflector_frame_id,reflector_child_frame_id);
 	if (sector_start_timestamp<last_time_stamp) 
 	{
@@ -293,10 +277,6 @@ printf("start loop\n");
                  << " stop A: " << sector_stop_angle);*/
             last_start_scan_time = start_scan_time;
             last_sector_stop_timestamp = sector_stop_timestamp;
-            
-			sick_nav350.SetSpeed(vx,vy,vth,sector_start_timestamp,0);
-//			printf("%.2f %.2f %.2f\n",vx,vy,vth);
-	
 		loop_rate.sleep();
 			ros::spinOnce();
 

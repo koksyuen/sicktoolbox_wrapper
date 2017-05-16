@@ -47,7 +47,6 @@ target_link_libraries(sicklms ${catkin_LIBRARIES})
 
 add_executable(sicknav350 ros/sicknav350/sicknav350.cpp)
 target_link_libraries(sicknav350 ${catkin_LIBRARIES})
-add_dependencies(sicknav350 sicktoolbox_wrapper_gencpp)
 
 add_executable(print_scans standalone/print_scans.cpp)
 target_link_libraries(print_scans ${catkin_LIBRARIES})
