@@ -207,8 +207,12 @@ int main(int argc, char *argv[])
   double active_sector_start_angle = 0;
   double active_sector_stop_angle = 360;//269.75;
   double smoothing_factor, error_threshold;
-  std::string sick_frame_id;
+  std::string sick_frame_id; 
   std::string target_frame_id; // the frame to be publish relative to frame_id
+  std::string scan_frame_id;   // The frame reported in the scan message.
+                               // Decoupling this from target_frame_id allows us to
+                               // display nav localization and ROS localization
+                               // simultaneously in RViz.
   std::string mobile_base_frame_id = "";
   std::string reflector_frame_id,reflector_child_frame_id;
   tf::StampedTransform sickn350_to_target_tf;
@@ -229,6 +233,7 @@ int main(int argc, char *argv[])
   nh_ns.param("perform_mapping", do_mapping, true);
   nh_ns.param<std::string>("frame_id", frame_id, "map");
   nh_ns.param<std::string>("sick_frame_id", sick_frame_id, "sick_nav350");
+  nh_ns.param<std::string>("scan_frame_id", scan_frame_id, sick_frame_id);
   nh_ns.param<std::string>("reflector_frame_id", reflector_frame_id, "nav350");
   nh_ns.param<std::string>("reflector_child_frame_id", reflector_child_frame_id, "reflector");
   nh_ns.param<std::string>("target_frame_id",target_frame_id,sick_frame_id);
@@ -467,7 +472,7 @@ int main(int argc, char *argv[])
       sector_stop_angle-=180;
       publish_scan(&scan_pub, range_values, num_measurements, intensity_values,
                    num_measurements, start_scan_time, scan_duration, inverted,
-                   DEG2RAD((float)sector_start_angle), DEG2RAD((float)sector_stop_angle), sick_frame_id, sector_start_timestamp,&scan_pub1);
+                   DEG2RAD((float)sector_start_angle), DEG2RAD((float)sector_stop_angle), scan_frame_id, sector_start_timestamp,&scan_pub1);
 
 
 
