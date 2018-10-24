@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(sicktoolbox_wrapper)
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs sicktoolbox rosconsole diagnostic_updater tf message_generation)
 
 ## System dependencies are found with CMake's conventions
