@@ -42,7 +42,7 @@ using namespace SickToolbox;
 
 // TODO: refactor these functions into a common util lib (similar to code in sicklms.cpp)
 void publish_scan(ros::Publisher *pub, double *range_values,
-                  uint32_t n_range_values, unsigned int *intensity_values,
+                  uint32_t n_range_values, int *intensity_values,
                   uint32_t n_intensity_values, ros::Time start,
                   double scan_time, bool inverted, float angle_min,
                   float angle_max, std::string frame_id,
@@ -71,7 +71,7 @@ void publish_scan(ros::Publisher *pub, double *range_values,
   }
   scan_msg.intensities.resize(n_intensity_values);
   for (size_t i = 0; i < n_intensity_values; i++) {
-    scan_msg.intensities[i] = 0;//(float)intensity_values[i];
+    scan_msg.intensities[i] = (float)intensity_values[i];
   }
   pub->publish(scan_msg);
   sicktoolbox_wrapper::navtimestamp st;
@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
   nh_ns.param("scan_rate", sick_motor_speed, 5);
   /* Define buffers for return values */
   double range_values[SickNav350::SICK_MAX_NUM_MEASUREMENTS] = {0};
-  unsigned int intensity_values[SickNav350::SICK_MAX_NUM_MEASUREMENTS] = {0};
+  int intensity_values[SickNav350::SICK_MAX_NUM_MEASUREMENTS] = {0};
   /* Define buffers to hold sector specific data */
   unsigned int num_measurements = {0};
   unsigned int sector_start_timestamp = {0};
@@ -269,7 +269,7 @@ int main(int argc, char *argv[])
   {
     /* Initialize the device */
     sick_nav350.Initialize();
-    //sick_nav350.GetSickIdentity();
+    sick_nav350.GetSickIdentity();
     // TODO: do some calls to setup the device - e.g. scan rate. Configure mapping. Configure reflectors/landmarks
 
     if (do_mapping)
@@ -281,6 +281,8 @@ int main(int argc, char *argv[])
     }
     try
     {
+      sick_nav350.SetOperatingMode((int)OperatingModes::STANDBY);
+      sick_nav350.SetScanDataFormat();
       sick_nav350.SetOperatingMode(op_mode);
     }
     catch (...)
@@ -387,6 +389,7 @@ int main(int argc, char *argv[])
       }
       ROS_DEBUG_STREAM("Getting sick range/scan measurements");
       sick_nav350.GetSickMeasurements(range_values,
+                                      intensity_values,
                                       &num_measurements,
                                       &sector_step_angle,
                                       &sector_start_angle,
