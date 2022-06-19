@@ -5,7 +5,8 @@
  * and the sample code from the sicktoolbox manual.
  *
  * Released under BSD license.
- */ 
+ */
+
 #include <iostream>
 #include <sstream>
 #include <sicktoolbox/SickNAV350.hh>
