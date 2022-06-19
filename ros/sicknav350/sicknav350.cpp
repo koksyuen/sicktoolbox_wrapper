@@ -1,17 +1,16 @@
 /*
  * Authors: Nick Hillier and Fred Pauling (CSIRO, 2011)
- * 
+ *
  * Based on the sicklms.cpp from the sicktoolbox_wrapper ROS package
  * and the sample code from the sicktoolbox manual.
- * 
+ *
  * Released under BSD license.
  */ 
-
 #include <iostream>
 #include <sstream>
 #include <sicktoolbox/SickNAV350.hh>
 #include "ros/ros.h"
-#include "sensor_msgs/LaserScan.h" 
+#include "sensor_msgs/LaserScan.h"
 #include <deque>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
@@ -81,10 +80,10 @@ void publish_scan(ros::Publisher *pub, double *range_values,
 }
 
 // A complimentary filter to get a (much) better time estimate, does not
-// calibrate out constant network latency delays, but does get rid of 
-// timming jitter to get better timing estimates than the 
+// calibrate out constant network latency delays, but does get rid of
+// timming jitter to get better timing estimates than the
 // communicated clock resolution (which is only 1ms)
-class smoothtime { 
+class smoothtime {
 protected:
   ros::Time smoothtime_prev, smoothed_timestamp;
   double time_smoothing_factor;
@@ -207,7 +206,7 @@ int main(int argc, char *argv[])
   double active_sector_start_angle = 0;
   double active_sector_stop_angle = 360;//269.75;
   double smoothing_factor, error_threshold;
-  std::string sick_frame_id; 
+  std::string sick_frame_id;
   std::string target_frame_id; // the frame to be publish relative to frame_id
   std::string scan_frame_id;   // The frame reported in the scan message.
                                // Decoupling this from target_frame_id allows us to
