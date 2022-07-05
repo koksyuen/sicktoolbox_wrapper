@@ -123,13 +123,17 @@ public:
   }
 };
 
-void createOdometryMessage(const ros::Duration& time_elapsed, const tf::Transform& prev_transform,
+void createOdometryMessage(const ros::Time& current_time, const ros::Duration& time_elapsed, const tf::Transform& prev_transform,
                            const tf::Transform& current_transform, nav_msgs::Odometry& odom_msg)
 {
   double dt = time_elapsed.toSec();
   double dx = (current_transform.getOrigin().getX() - prev_transform.getOrigin().getX())/dt;
   double dy = (current_transform.getOrigin().getY() - prev_transform.getOrigin().getY())/dt;
   double dr = (tf::getYaw(current_transform.getRotation()) - tf::getYaw(prev_transform.getRotation()))/dt;
+
+  odom_msg.header.stamp = current_time;
+  odom_msg.header.frame_id = "sick/odom";
+  odom_msg.child_frame_id = "sick/base_link";
 
   // setting position
   odom_msg.pose.pose.position.x = current_transform.getOrigin().getX();
@@ -423,7 +427,7 @@ int main(int argc, char *argv[])
       if(publish_odom)
       {
         mobile_base_current_tf = odom_to_target_tf*target_to_mobile_base_tf;
-        createOdometryMessage(ros::Time::now() - previous_time,mobile_base_prev_tf,mobile_base_current_tf,odom_msg);
+        createOdometryMessage(ros::Time::now(), ros::Time::now() - previous_time,mobile_base_prev_tf,mobile_base_current_tf,odom_msg);
         mobile_base_prev_tf = mobile_base_current_tf;
         previous_time = ros::Time::now();
         odom_pub.publish(odom_msg);

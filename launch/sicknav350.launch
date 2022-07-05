@@ -8,7 +8,7 @@
           args="0 0 0 0 0 0 $(arg tf_prefix)/map $(arg tf_prefix)/odom 100" />
 
     <node name="static_tf_nav350" pkg="tf" type="static_transform_publisher"
-          args="0 0 0 0 0 0 $(arg tf_prefix)/base_link $(arg tf_prefix)/nav350 100" />
+          args="-0.05945 0 0 0 0 0 $(arg tf_prefix)/base_link $(arg tf_prefix)/nav350 100" />
 
 
     <node name="sicknav350" pkg="sicktoolbox_wrapper" type="sicknav350" output="screen">
@@ -36,4 +36,18 @@
   </group>
 
       <node name="rviz" pkg="rviz" type="rviz" args="-d $(find sicktoolbox_wrapper)/nav350_localization.rviz"/>
+
+      <!-- <node pkg="hector_trajectory_server" type="hector_trajectory_server" name="trajectory_server_nav350" output="screen" ns="nav350_ros" >
+          <param name="/target_frame_name" value="sick/odom" />
+          <param name="/source_frame_name" value="sick/base_link" />
+          <param name="/trajectory_update_rate" value="20.0" />
+          <param name="/trajectory_publish_rate" value="20.0" />
+      </node>
+
+      <node pkg="hector_trajectory_server" type="hector_trajectory_server" name="trajectory_server_t265" output="screen" ns="nav350_ros" >
+          <param name="/target_frame_name" value="t265_odom_frame" />
+          <param name="/source_frame_name" value="t265_pose_frame" />
+          <param name="/trajectory_update_rate" value="20.0" />
+          <param name="/trajectory_publish_rate" value="20.0" /> -->
+      <!-- </node> -->
 </launch>
